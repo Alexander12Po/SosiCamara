@@ -6,19 +6,24 @@ import os
 app = Flask(__name__)
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-MODEL = "llama-3.1-70b-versatile"
+MODEL = "llama-3.3-70b-versatile"  # llama-3.1-70b-versatile fue descontinuado por Groq
 
 PROMPT_ESPECIALISTA_AUTOS = """Eres un especialista senior en automóviles deportivos y supercarros,
 con experiencia real en concesionarias y talleres de alta gama: Ferrari, Lamborghini (incluyendo el Huracán
 y sus variantes EVO, STO, Tecnica), Porsche, McLaren, Aston Martin, entre otras marcas.
+
 Respondes siempre en español, con tono profesional pero cercano, como si atendieras a un cliente en el
 mostrador de una concesionaria o en un taller especializado.
+
 Das información técnica precisa cuando se pregunta (motor, potencia, 0-100, tracción, diferencias entre
 modelos o versiones), y también puedes dar opiniones fundamentadas si te las piden (cuál conviene según
 uso, comparativas, mantenimiento, etc.).
+
 No inventes cifras si no estás seguro; en ese caso acláralo en vez de dar un dato falso.
+
 Estás en un chat conversacional, no un documento: no uses encabezados Markdown (#, ##, ###) ni líneas
 horizontales (---). Puedes usar negritas y listas simples si ayuda a ordenar la respuesta.
+
 No generes código; este chat es exclusivamente para consultas sobre automóviles."""
 
 
@@ -29,7 +34,11 @@ def index():
 
 @app.route("/chat-mecanico", methods=["POST"])
 def chat_mecanico():
+    # Acepta tanto form-data como JSON, por si el frontend cambia de formato
     mensaje = request.form.get("mensaje", "").strip()
+    if not mensaje and request.is_json:
+        mensaje = (request.json or {}).get("mensaje", "").strip()
+
     if not mensaje:
         return jsonify({"error": "Mensaje vacío"}), 400
 
@@ -54,6 +63,17 @@ def chat_mecanico():
         }
         try:
             res = requests.post(url, headers=headers, json=payload, stream=True, timeout=(10, 60))
+
+            if res.status_code != 200:
+                # Propaga el motivo real del fallo (clave inválida, modelo inexistente, etc.)
+                try:
+                    err_body = res.json()
+                    err_msg = err_body.get("error", {}).get("message", res.text)
+                except Exception:
+                    err_msg = res.text
+                yield f"Error del servicio ({res.status_code}): {err_msg}"
+                return
+
             for line in res.iter_lines():
                 if line:
                     decoded_line = line.decode('utf-8').strip()
@@ -66,10 +86,10 @@ def chat_mecanico():
                             pass
         except requests.exceptions.Timeout:
             yield "El especialista está tardando demasiado en responder. Intenta de nuevo en un momento."
-        except requests.exceptions.RequestException:
-            yield "No se pudo conectar con el especialista en este momento."
-        except Exception:
-            yield "Error al procesar la consulta."
+        except requests.exceptions.RequestException as e:
+            yield f"No se pudo conectar con el especialista en este momento. ({e})"
+        except Exception as e:
+            yield f"Error al procesar la consulta. ({e})"
 
     return Response(stream_with_context(generate_response()), mimetype='text/plain')
 
