@@ -5,8 +5,9 @@ import os
 
 app = Flask(__name__)
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-MODEL = "llama-3.3-70b-versatile"  # llama-3.1-70b-versatile fue descontinuado por Groq
+# La clave ahora se lee correctamente del entorno
+GROQ_API_KEY = os.environ.get("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")
+MODEL = "llama-3.3-70b-versatile" 
 
 PROMPT_ESPECIALISTA_AUTOS = """Eres un especialista senior en automóviles deportivos y supercarros,
 con experiencia real en concesionarias y talleres de alta gama: Ferrari, Lamborghini (incluyendo el Huracán
@@ -53,7 +54,7 @@ def chat_mecanico():
     def generate_response():
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
-            "Authorization": f"Bearer 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",
+            "Authorization": f"Bearer {GROQ_API_KEY}", # <-- CORRECCIÓN APLICADA AQUÍ
             "Content-Type": "application/json"
         }
         payload = {
@@ -95,4 +96,6 @@ def chat_mecanico():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    # host='0.0.0.0' permite que otros dispositivos en tu red local (como tu celular) accedan a la app
+    app.run(debug=True, host='0.0.0.0')
+    
