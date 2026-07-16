@@ -37,7 +37,7 @@ def chat_mecanico():
     def generate_response():
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Authorization": f"Bearer {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}",
             "Content-Type": "application/json"
         }
         payload = {
