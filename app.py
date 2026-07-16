@@ -1,5 +1,13 @@
-# Pega este bloque en tu app.py (junto al resto de tus rutas /chat, /login, etc.)
-# Reutiliza GROQ_API_KEY y MODEL que ya tienes definidos arriba en el archivo.
+from flask import Flask, request, jsonify, Response, stream_with_context
+import requests
+import json
+import os
+
+app = Flask(__name__)  # <-- Esto es lo que Vercel busca: debe estar a nivel superior
+
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+MODEL = "llama-3.1-70b-versatile"  # ajusta al modelo que uses
+
 
 PROMPT_ESPECIALISTA_AUTOS = """Eres un especialista senior en automóviles deportivos y supercarros,
 con experiencia real en concesionarias y talleres de alta gama: Ferrari, Lamborghini (incluyendo el Huracán
@@ -57,3 +65,7 @@ def chat_mecanico():
             yield "Error al procesar la consulta."
 
     return Response(stream_with_context(generate_response()), mimetype='text/plain')
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
