@@ -1,13 +1,12 @@
-from flask import Flask, request, jsonify, Response, stream_with_context
+from flask import Flask, request, jsonify, Response, stream_with_context, render_template
 import requests
 import json
 import os
 
-app = Flask(__name__)  # <-- Esto es lo que Vercel busca: debe estar a nivel superior
+app = Flask(__name__)
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-MODEL = "llama-3.1-70b-versatile"  # ajusta al modelo que uses
-
+MODEL = "llama-3.1-70b-versatile"
 
 PROMPT_ESPECIALISTA_AUTOS = """Eres un especialista senior en automóviles deportivos y supercarros,
 con experiencia real en concesionarias y talleres de alta gama: Ferrari, Lamborghini (incluyendo el Huracán
@@ -23,11 +22,19 @@ horizontales (---). Puedes usar negritas y listas simples si ayuda a ordenar la 
 No generes código; este chat es exclusivamente para consultas sobre automóviles."""
 
 
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+
 @app.route("/chat-mecanico", methods=["POST"])
 def chat_mecanico():
     mensaje = request.form.get("mensaje", "").strip()
     if not mensaje:
         return jsonify({"error": "Mensaje vacío"}), 400
+
+    if not GROQ_API_KEY:
+        return jsonify({"error": "Falta configurar GROQ_API_KEY en el servidor"}), 500
 
     messages_payload = [
         {"role": "system", "content": PROMPT_ESPECIALISTA_AUTOS},
@@ -37,7 +44,7 @@ def chat_mecanico():
     def generate_response():
         url = "https://api.groq.com/openai/v1/chat/completions"
         headers = {
-            "Authorization": f"Bearer {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}",
+            "Authorization": f"Bearer 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",
             "Content-Type": "application/json"
         }
         payload = {
