@@ -498,7 +498,6 @@ function getAudioCtx(){
   return audioCtx;
 }
 
-// Distorsión suave para dar textura de motor (no es audio real grabado, es sintetizado)
 function makeDistortionCurve(amount){
   const n = 44100;
   const curve = new Float32Array(n);
@@ -513,7 +512,6 @@ function playEngineSound(cls, speedStat){
   const ctx = getAudioCtx();
   const now = ctx.currentTime;
 
-  // Clases más altas => motor más grave, potente y con revs más largos
   const profile = {
     D:{base:130, peak:230, dur:0.55, gain:0.16},
     C:{base:110, peak:260, dur:0.6,  gain:0.18},
@@ -536,14 +534,12 @@ function playEngineSound(cls, speedStat){
   shaper.curve = makeDistortionCurve(6);
   shaper.connect(filter);
 
-  // Oscilador principal: barrido de revoluciones (sube y luego cae, como un "vroom")
   const osc1 = ctx.createOscillator();
   osc1.type = 'sawtooth';
   osc1.frequency.setValueAtTime(profile.base, now);
   osc1.frequency.linearRampToValueAtTime(profile.peak, now + profile.dur * 0.45);
   osc1.frequency.exponentialRampToValueAtTime(profile.base * 0.8, now + profile.dur);
 
-  // Segundo oscilador, una quinta abajo, para dar cuerpo al "bloque motor"
   const osc2 = ctx.createOscillator();
   osc2.type = 'square';
   osc2.frequency.setValueAtTime(profile.base * 0.5, now);
@@ -557,7 +553,6 @@ function playEngineSound(cls, speedStat){
   osc2.connect(osc2Gain);
   osc2Gain.connect(shaper);
 
-  // Textura de "arranque": breve ruido blanco al inicio
   const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.12, ctx.sampleRate);
   const data = noiseBuffer.getChannelData(0);
   for(let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * 0.5;
@@ -569,7 +564,6 @@ function playEngineSound(cls, speedStat){
   noise.connect(noiseGain);
   noiseGain.connect(master);
 
-  // Envolvente general de volumen
   master.gain.setValueAtTime(0.0001, now);
   master.gain.exponentialRampToValueAtTime(profile.gain, now + 0.06);
   master.gain.exponentialRampToValueAtTime(profile.gain * 0.7, now + profile.dur * 0.5);
@@ -608,7 +602,7 @@ function renderCard(car){
       ${statRow('VEL', car.speed)}
       ${statRow('ACEL', car.accel)}
       ${statRow('MANEJO', car.handling)}
-      ${statRow('NITRO', car.nitro)}
+            ${statRow('NITRO', car.nitro)}
     </div>
     <div class="card-footer">
       <div class="ptp"><span>PTP</span>${car.ptp}</div>
@@ -695,7 +689,7 @@ tabsEl.querySelectorAll('.tab').forEach(tab=>{
 
 render('ALL');
 
-/* ---------- ESCRITORIO DEL ESPECIALISTA ---------- */
+/* ---------- ESCRITORIO DEL ESPECIALISTA (CONECTADO A TU FLASK) ---------- */
 const deskInput = document.getElementById('deskInput');
 const deskSend = document.getElementById('deskSend');
 const deskResponse = document.getElementById('deskResponse');
@@ -714,35 +708,34 @@ async function askSpecialist(){
   deskResponse.textContent = 'Consultando al especialista...';
 
   try{
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    // Conexión corregida a tu backend Flask local con soporte de streaming
+    const res = await fetch('/chat-mecanico', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [
-          {
-            role: 'user',
-            content: `Sos un especialista en autos deportivos y supercars reales (Ferrari, Lamborghini, Porsche, McLaren, etc). Respondé en español, de forma clara y concisa (máximo 120 palabras), a esta consulta: "${question}"`
-          }
-        ]
-      })
+      body: JSON.stringify({ mensaje: question })
     });
 
     if(!res.ok) throw new Error('Respuesta no válida del servidor');
 
-    const data = await res.json();
-    const text = (data.content || [])
-      .map(block => block.text || '')
-      .filter(Boolean)
-      .join('\n')
-      .trim();
-
     deskResponse.classList.remove('loading');
-    deskResponse.textContent = text || 'No se pudo obtener una respuesta. Probá de nuevo.';
+    deskResponse.textContent = ''; // Limpiar el texto de carga
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let finished = false;
+
+    while(!finished) {
+      const { value, done } = await reader.read();
+      finished = done;
+      if (value) {
+        const chunk = decoder.decode(value, { stream: !done });
+        deskResponse.textContent += chunk;
+      }
+    }
   }catch(err){
     deskResponse.classList.remove('loading');
     deskResponse.textContent = 'Hubo un error consultando al especialista. Intentá de nuevo en unos segundos.';
+    console.error(err);
   }finally{
     deskSend.disabled = false;
   }
